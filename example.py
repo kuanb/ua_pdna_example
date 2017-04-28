@@ -80,6 +80,7 @@ loaded_feeds = urbanaccess.gtfs.load.gtfsfeed_to_df(gtfsfeed_path,
                                                     bbox,
                                                     remove_stops_outsidebbox,
                                                     append_definitions)
+
 # =============
 # Section break
 # =============
@@ -201,12 +202,16 @@ if PLOT_NETWORK:
 # now to shift over to pandana's domain
 nod_x = urbanaccess_nw.net_nodes['x']
 nod_y = urbanaccess_nw.net_nodes['y']
-edg_fr = urbanaccess_nw.net_edges['from']
-edg_to = urbanaccess_nw.net_edges['to']
+
+# use the integer representation of each from and to id
+# (pandana can't handle them as strings)
+edg_fr = urbanaccess_nw.net_edges['from_int']
+edg_to = urbanaccess_nw.net_edges['to_int']
 edg_wt_df = urbanaccess_nw.net_edges[['weight']]
 
 # insantiate a pandana network object
-p_net = pdna.Network(nod_x, nod_y, edg_fr, edg_to, edg_wt_df)
+# set twoway to false since UA networks are oneways
+p_net = pdna.Network(nod_x, nod_y, edg_fr, edg_to, edg_wt_df, twoway=False)
 
 # precompute step, requires a max 'horizon' distance
 horizon_dist = 60
@@ -229,21 +234,17 @@ p_net.set(blocks_gdf['node_ids'],
           variable=blocks_gdf['emp'],
           name='emp')
 
-# This results in near-identical series outputs
-# Expected result would be greater job access each iteration (higher n)
+
 for n in [15,30,45,60]:
     s = p_net.aggregate(n, type='sum', decay='linear', imp_name='weight', name='emp')
-    print(s.max())
-    print(s.mean())
-    print(s.min())
-    print(len(s[s>0]))
-
-p_net.plot(s, 
-         bbox=bbox,
-         fig_kwargs={'figsize': [35, 35]},
-         bmap_kwargs={'suppress_ticks': False,
-                      'resolution': 'h', 'epsg': '26943'},
-         plot_kwargs={'cmap': 'BrBG', 's': 8, 'edgecolor': 'none'})
+    a, b, c = p_net.plot(s, 
+             bbox=(bbox[1], bbox[0], bbox[3], bbox[2]),
+             fig_kwargs={'figsize': [35, 35]},
+             bmap_kwargs={'suppress_ticks': False,
+                          'resolution': 'h', 'epsg': '26943'},
+             plot_kwargs={'cmap': 'hot', 's': 8, 'edgecolor': 'none'})
+    c.set_axis_bgcolor('black')
+    b.savefig('testplot_' + str(n) + '_min.png', facecolor='black')
 
 # helper functions
 def _parse_wkt(s):
